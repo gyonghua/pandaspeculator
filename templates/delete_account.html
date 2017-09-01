@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="ui container middle aligned grid">
+        <div class="ui centered column segment center aligned">
+                
+                <h1 class="ui blue header">
+                Delete your Account: &nbsp; {{ username }}
+                </h1>   
+                Do you really want to delete your account? This step is irreversible.
+                <br><br>
+                <form action="{{ url_for('login.delete_account', username=form.username.data)}}", method="POST">
+                    {{ form.csrf_token }}
+                    {{form.username}}
+                    
+                <button class="ui button blue delete">Confirm</button>
+                </form>    
+        </div>
+</div>
+
+
+{% endblock %}

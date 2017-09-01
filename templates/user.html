@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="ui container middle aligned two column grid stackable">
+    
+    
+    <div class="ui centered column segment">
+        <div class="ui column sixteen wide">      
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                      
+                    {% for category, message in messages %}
+                    <div class="ui message {{ category }} flash">
+                            <i class="close icon"></i>
+                        {{ message }}
+                    </div>        
+                    {% endfor %}
+                      
+            {% endif %}
+            {% endwith %}
+        </div>
+        {% if not user.email_confirmed or user.telegram_id == None %}
+        <h3 class="ui header blue">Set-up Guide</h3>
+        {% endif %}
+        {% if not user.email_confirmed %}
+            <h4 class="header ui">Email</h4>
+            <div class="ui message negative"><b>Your email is not confirmed.</b></div>
+            <p>To start receiving reports, please <b>confirm</b> your email.</p>
+            <p>The email was sent to <b>{{ user.email }}</b>. Please click the link in the  message to confirm your email address</p>
+            <p><a href="{{ url_for('login.resend_confirmation_email', username = user.username) }}">Resend confirmation email</a> or <a href="{{ url_for('login.change_info', username = user.username) }}">Change your email</a></p>
+            <p>Be sure to check your junk or span folder.
+                The sender is <b>alerts@pandaspeculator.com</b></p>
+        {% endif %}
+
+        {% if user.telegram_id == None %}
+        <h4 class="header ui">Telegram notifications</h4>
+        <div class="ui message negative"><b>You have not verified your identity with our Telegram bot</b></div>
+        <p>To begin receiving bar pattern alerts. Do the following:</p>
+        <ol class="ui list">
+            <li><a target = "_blank" href="https://telegram.org/apps">Get a Telegram account</a></li>
+            <li>Establish contact with our <a target = "_blank" href="http://t.me/barpattern_bot">barpattern_bot:</a>
+                <ol>
+                    <li>Click on the following link: <a target = "_blank" href="http://t.me/barpattern_bot">http://t.me/barpattern_bot</a></li>
+                    <li>On your Telegram app, go to contacts, search for <b>@barpattern_bot</b>. It   should appear on your "global search result"</li>
+                </ol>
+            </li>
+            <li>Tap on <b>Start</b>. Speak to the bot and follow its instruction</li>
+        </ol>
+        {% endif %}
+        {% if  (not user.email_confirmed) or (not user.telegram_id) %}
+        <b>More information about the services will be provided once set-up is completed.</b>
+        {% endif %}
+
+        {% if user.email_confirmed or user.telegram_id %}
+        <h3 class="ui header blue">Information</h3>
+        {% endif %}
+
+        {% if user.email_confirmed %}
+            <h4 class="ui header">Reports</h4>
+            <p>The <b>stop cluster report</b> is sent Mon-Fri daily at 0600 GMT. For each pair, it contains    the following information:
+                    <ul class="ui list">
+                        <li>20 day ADR (average daily range)</li>
+                        <li>bid/ask price at the time of report</li>
+                        <li>Top 5 sell and buy stop clusters at time of report in the format (price, percentage)</li>
+                    </ul>
+            <p>Do note that the information contained within the report are estimates as the forex market does not operate on a Central Exchange.</p>
+        {% endif %}
+
+        {% if user.telegram_id %}
+            <h4 class="ui header">Alerts</h4>
+            <p>The bot detects the following patterns:</p>
+            <ul class="ui list">
+                <li>bullish/bearish pin bars</li>
+                <li>bullish/bearish outside bars</li>
+            </ul>
+            <p>You will only receive alerts when the patterns form</p>
+            <p>Customise the pairs and timeframes that you want to recieve the alerts for on the panel to the right</p>
+            <p>The daily close time is set to be 2200 GMT. The pattern detection for daily timeframe is also based on this timing.</p>
+        {% endif %}
+        
+    </div>
+
+    <div class="ui centered column">
+        <div class="ui grid horizontally padded">
+            
+            <div class="ui grey left ribbon large label">
+                Welcome {{ current_user.username }}!
+                {% if current_user.role == "admin" %}
+                <a href="{{url_for('login.admin_panel')}}" class="detail">Admin panel</a>
+                {% endif %}
+                <a href="{{ url_for('login.logout') }}" class="detail">Logout</a>
+                
+            </div>
+            
+            <div class="ui column sixteen wide remove-padding form-title">
+                    <h2 class="ui header blue">Alerts</h2>  
+            </div>
+
+            <form method="POST" action="{{ url_for('login.settings', username=user.username) }}" class="ui form sixteen wide column centered remove-padding">
+                <div class="fields">
+                    {{form.csrf_token}}
+                    <div class="hour-form field">
+                        <h3 class="ui header">1 Hour</h3>
+                        {% for item in ["EU_H1", "GU_H1", "UJ_H1", "AU_H1", "UC_H1", "EG_H1", "EJ_H1"] %}
+                        <div class="">
+                        <div class="ui checkbox">
+                            
+                            {{ form[item] }}
+                            {{ form[item].label }}
+                        </div>
+                        </div>
+                        {% endfor %}    
+                        <div class="ui checkbox">
+                            <input type="checkbox" class = "hour" id="hour">
+                            <label for="hour">All</label>
+                        </div>
+                    </div>
+
+                    <div class="four-hour-form field">
+                        <h3 class="ui header">4 hour</h3>
+                        {% for item in ["EU_H4", "GU_H4", "UJ_H4", "AU_H4", "UC_H4", "EG_H4", "EJ_H4"] %}
+                            <div class="">
+                            <div class="ui checkbox">
+                                
+                                {{ form[item] }}
+                                {{ form[item].label }}
+                            </div>
+                            </div>
+                        {% endfor %} 
+                        <div class="ui checkbox">
+                            <input type="checkbox" class = "four-hour"  id="four-hour">
+                            <label for="four-hour">All</label>
+                        </div>
+                    </div>
+
+                    <div class="day-form field">
+                        <h3 class="ui header">Daily</h3>
+                        {% for item in ["EU_D", "GU_D", "UJ_D", "AU_D", "UC_D", "EG_D", "EJ_D"] %}
+                            <div class="field">
+                            <div class="ui checkbox"> 
+                                {{ form[item] }}
+                                {{ form[item].label }}
+                            </div>
+                            </div>
+                        {% endfor %}   
+                        <div class="ui checkbox">
+                            <input type="checkbox" class = "day" id="day">
+                            <label for="day">All</label>
+                        </div>
+                    </div>     
+                </div> <!--close fields-->
+
+                <div class="ui sixteen wide">
+                        <h2 class="ui header blue">Reports</h2>  
+                </div>
+                <div class="report-form field">
+                    <div class="ui checkbox">
+                        {{form.ordersub}}
+                        {{form.ordersub.label}}
+                    </div>
+                </div>
+                <div class="field eight wide">
+                    <button class="ui button blue update-sub">Update subscription</button>
+                </div>
+                <div class="ui section divider">
+                    
+                </div>
+                <div class="column sixteen wide profile">
+                    <div class="ui grid ">
+                        <div class="column eight wide">
+                            <h2 class="ui header blue">Profile</h2>
+                            {% if user.username != current_user.username %}
+                            <div class="label ui red">This is not your profile</div>
+                            {% endif %}
+                        </div>
+                        <div class="column sixteen wide remove-padding-header">
+                            <h3>{{ user.username }}</h3>
+                        </div>
+                        <div class="email column sixteen wide remove-padding">
+                            {{ user.email }}
+                        </div>
+                        <div class="column sixteen wide">
+                            <a href = "{{ url_for('login.change_info', username = user.username) }}" class="ui button blue basic">Change password/email</a>
+                            <a href="{{ url_for('login.delete_account', username=user.username) }}" class="ui button red">Delete account</a>
+                        </div> 
+                    </div>
+                </div>
+            </form>
+            {% if current_user.role == "admin" %}
+            <div class="column sixteen wide">
+            
+                <h3 class="header ui">Admin only</h3>
+                <form action="{{ url_for('login.admin_edit_profile', username=user.username) }}" class="form ui small" method="POST">
+                    {{admin_form.csrf_token}}    
+                        <div class="field">
+                            {{ admin_form.role.label }}
+                            {{ admin_form.role }}
+                        </div>
+                    
+                    
+                    <div class="fields">
+                        <div class="ten wide field">
+                            {{ admin_form.email.label }}
+                            {{ admin_form.email }}
+                            
+                        </div>
+                        <div class="ui compact segment">
+                            <div class="ui checkbox field">
+                                    {{ admin_form.email_confirmed }}
+                                    {{ admin_form.email_confirmed.label }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="two fields">    
+                        <div class="ui field toggle checkbox">
+                            {{ admin_form.active }}
+                            {{ admin_form.active.label }}
+                            
+                        </div>
+                        <div class="field">
+                            <button class="ui button blue fluid update-prof">Update profile</button>
+                        </div>
+                    </div>
+  
+                </form>
+            </div>
+            {% endif %}
+        </div> <!-- close inner grid -->
+    </div>    
+</div>
+{% endblock %}
+
+{% block script %}
+{{ super() }}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.13/components/transition.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.13/components/dimmer.min.js"></script>
+<script>
+        (function() {
+            var toggleCheckboxeshr = toggleCheckbox(".hour", ".hour-form")
+            var toggleCheckboxes4hr = toggleCheckbox(".four-hour", ".four-hour-form")
+            var toggleCheckboxesD = toggleCheckbox(".day", ".day-form")
+            var toggleCheckboxStatushr = toggleCheckboxStatus(".hour", ".hour-form")
+            var toggleCheckboxStatus4hr = toggleCheckboxStatus(".four-hour", ".four-hour-form")
+            var toggleCheckboxStatusD = toggleCheckboxStatus(".day", ".day-form")
+            
+            document.querySelector(".hour").addEventListener("change",toggleCheckboxeshr)
+            document.querySelector(".four-hour").addEventListener("change",toggleCheckboxes4hr)
+            document.querySelector(".day").addEventListener("change",toggleCheckboxesD)
+    
+            document.querySelector(".hour-form").addEventListener("change",toggleCheckboxStatushr)
+            document.querySelector(".four-hour-form").addEventListener("change",toggleCheckboxStatus4hr)
+            document.querySelector(".day-form").addEventListener("change",toggleCheckboxStatusD)
+
+            document.querySelector(".update-sub").addEventListener("click",dimscreen)
+            if (document.querySelector(".update-prof")){
+                document.querySelector(".update-prof").addEventListener("click",dimscreen)
+            }
+            
+            
+            function toggleCheckbox(time, form){
+                function toggle(e) {
+                    e.preventDefault()
+                    
+                    var checkbox = document.querySelector(time)
+                    var boxes = document.querySelectorAll(form + " input[type='checkbox'] ")
+                    
+                    if (checkbox.checked == false){
+                        for (var i = 0; i<boxes.length-1; i++){
+                            boxes[i].checked = false
+                        }
+                    }
+                    
+                    else if (checkbox.checked == true) {
+                        for (var i = 0; i<boxes.length-1; i++){
+                            boxes[i].checked = true
+                        }
+                    }
+                }
+                return toggle
+            }
+            
+            function toggleCheckboxStatus(time, form){
+                function toggle(e){
+                    if (e) {
+                        e.preventDefault()
+                    }
+                    
+                    var checkbox = document.querySelector(time)
+                    var boxes = document.querySelectorAll(form + " input:checked[value='y']")
+                    if (boxes.length < 7) {
+                        checkbox.checked = false
+                    }
+                    else {
+                        checkbox.checked = true
+                    }
+                }
+                return toggle
+            }
+            function dimscreen() {
+                $("body").dimmer("show")
+            }            
+          
+            // to toggle on/off on load base on criteria
+            toggleCheckboxStatushr()
+            toggleCheckboxStatus4hr()
+            toggleCheckboxStatusD()
+            
+            if ($(".flash").length) {
+                $(".flash").transition("shake")
+            
+            }
+            $('.message .close').on('click', function() {
+                $(this).closest('.message').transition({
+                    "animation" : "fade",
+                    "duration" : "100ms"
+                })
+    ;
+  })
+;
+        })()
+</script>
+{% endblock %}
+
+

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="ui container middle aligned grid">
+<div class="ui centered column">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    
+        
+            {% for category, message in messages %}
+                <div class="ui message {{ category }}">
+                {{ message }}
+                </div>        
+            {% endfor%}
+        
+    
+    {% endif %}
+    {% endwith %}
+<form action="{{url_for('login.login')}}" method="POST" class="ui large form segment">
+    <h3 class="ui dividing header">
+        Sign in to Continue
+    </h3>
+    {{form.csrf_token}}
+    <div class="field">
+        {{form.username.label}}
+        {{form.username}}
+         
+        {% if form.username.errors %}
+        <div class="ui pointing red basic label">
+        <ul>
+        {% for error in form.username.errors %}
+            <li>
+                {{error}}
+            </li>
+        {% endfor %}
+        </ul>
+        </div>
+        {% endif %}  
+    </div>
+    <div class="field">
+        {{form.password.label}}
+        {{form.password}}
+    
+        {% if form.password.errors %}
+            <div class="ui pointing red basic label">
+                <ul>
+                {% for error in form.password.errors %}
+                <li>
+                    {{error}}
+                </li>
+                {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+    </div>
+    <div class="two fields">
+        <div class="field">
+            <button class="ui button primary fluid">Sign in</button>
+        </div>
+        <div class="field">
+            <a href="{{url_for('login.register_user')}}" class="ui button secondary fluid">Register</a>     
+        </div>
+    </div>
+    <div class="field">
+        <a href="{{url_for('login.reset_password')}}">Forget password</a>
+    </div>
+</form>
+    
+</div>
+</div> <!-- end container -->
+
+
+{% endblock %}

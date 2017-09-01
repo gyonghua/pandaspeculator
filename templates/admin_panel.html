@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="ui container middle aligned grid admin">
+    
+    <div class="ui centered column sixteen wide segment">
+            <div class="ui grey right ribbon large label">
+                    Welcome {{ current_user.username }}!
+                    <a href="{{ url_for('login.logout') }}" class="detail">Logout</a>
+                    
+            </div>
+        
+            <h3 class="ui header blue">Admin panel</h3>
+            <table class="ui celled table">
+                    <thead>
+                    <tr>
+                        <th>user_id</th>
+                        <th>username</th>
+                        <th>email</th>
+                        <th>email_confirmed</th>
+                        <th>telegram_id</th>
+                        <th>role</th>
+                        <th>is_active</th>
+                        <th>created_on</th>
+                        <th>subscribed till</th>
+                    </tr>
+                </thead>
+            <tbody>
+                {% for user in users%}
+                    <tr>
+                        <td>{{ user.user_id }}</td>
+                        <td><a href="{{url_for('login.settings', username=user.username)}}">{{ user.username }}</a></td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.email_confirmed }}</td>
+                        <td>{{ user.telegram_id }}</td>
+                        <td>{{ user.role }}</td>
+                        <td>{{ user.active }}</td>
+                        <td class = "time">{{ user.created_on }}</td>
+                        <td>{{ user.subscribed_till }}</td>
+                    </tr>
+                {% endfor %}
+
+            <tbody>        
+            </table>
+
+        
+        
+    </div>
+</div>
+{% endblock %}
+{% block script %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.18.1/moment-with-locales.min.js"></script>
+
+<script>
+    (function(){
+       creation_dates = document.querySelectorAll(".time") 
+        for (var i=0; i<creation_dates.length; i++) {
+            creation_dates[i].innerHTML = moment.unix(creation_dates[i].innerHTML).format("ddd YYYY-MMM-D HH:mm Z")
+        }
+        console.log(creation_dates.length)
+
+    })()
+</script>
+{% endblock %}
+

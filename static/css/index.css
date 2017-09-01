@@ -1,0 +1,38 @@
+body, html{
+    margin: 0 auto;
+    padding: 0;
+}
+
+html {
+    font-family: Frutiger, "Frutiger Linotype", Univers, Calibri, "Gill Sans", "Gill Sans MT", "Myriad Pro", Myriad, "DejaVu Sans Condensed", "Liberation Sans", "Nimbus Sans L", Tahoma, Geneva, "Helvetica Neue", Helvetica, Arial, sans-serif; 
+    font-size: 20px;
+    box-sizing: border-box;
+    color: #212121;
+    
+    
+}
+
+main {
+    background-image: url(https://unsplash.it/1600/?image=1019);
+    background-size: cover;
+    background-position: center;
+    height: 100vh;
+    background-attachment: fixed;
+    align-content: center;
+    
+
+}
+
+.hero-text-box {
+    background-color: rgba(240,255,255 ,0.5);
+    color: #141823; 
+    font-size: 120%;
+    position: absolute;
+    max-width: 1140px;
+    padding: 10px;
+    border-radius: 7px;
+    top: 50%;
+    left: 50%;
+    -webkit-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
+}

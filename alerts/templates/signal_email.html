@@ -1,0 +1,15 @@
+<html>
+    <body>
+    
+    {% for signal in signals %}
+        <h4>{{ signal[0] }}</h4>
+        
+        <p>
+            <b>SL</b> {{ signal[1] }} <br>
+            <b>Entry</b> {{ signal[2] }} <br>
+            <b>TP</b> {{ signal[3] }} 
+        </p>
+    {% endfor %}
+    
+    </body>
+    </html>

@@ -1,0 +1,39 @@
+body {
+    background-color: rgba(236,240,241 ,1);    
+}
+
+.column {
+max-width: 450px;
+}
+
+.admin .column {
+    max-width: 1080px;
+}
+
+.grid {
+    height: 100%;
+}
+
+.admin.container .grid {
+    height: 100%;
+}
+
+.center_text {
+    text-align: center;
+}
+
+.form-title.column.sixteen.wide.remove-padding {
+    padding-bottom: 0;
+}
+.form.sixteen.wide.column.remove-padding {
+    padding-top: 0;
+}
+
+.profile .column.email.remove-padding, .profile .column.wide.remove-padding-header {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.features {
+    font-size: 1.5rem;
+}

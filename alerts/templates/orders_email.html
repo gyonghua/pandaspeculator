@@ -1,0 +1,14 @@
+<html>
+<body>
+
+{% for item in orderbook %}
+    <h3>{{ item[0][1] }} ({{ item[1] }})</h3>
+    <h4>ADR(20): {{item[2]}}</h4>
+    <p>
+        <b>top buy stops:</b> {{ item[0][2] }} <br>
+        <b>top sell stops:</b> {{ item[0][3] }} 
+    </p>
+{% endfor %}
+
+</body>
+</html>

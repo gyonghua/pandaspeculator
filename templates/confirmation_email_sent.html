@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="ui container middle aligned grid">
+        <div class="ui centered column segment center aligned">
+                <h1 class="ui blue header">
+                    Thank you for registering!
+                </h1>   
+
+                <p>We've sent an email to {{email}}</p>
+                <p>Click the link in that message to confirm your email. Note that the link expires in 12 hours.</p>
+
+                Click the button to go to the settings page: <br><br>
+                <a href="{{url_for('login.settings', username = current_user.username)}}" class="ui button blue">Settings</a>
+
+        </div>
+</div>
+{% endblock %}

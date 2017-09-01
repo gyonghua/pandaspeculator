@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="ui container middle aligned grid">
+        
+        <div class="ui centered column sixteen wide segment">
+                <div class="ui grey right ribbon large label">
+                        Welcome {{ current_user.username }}!
+                        <a href="{{ url_for('login.logout') }}" class="detail">Logout</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}    
+                        {% for category, message in messages %}
+                        <div class="ui {{category}} message">
+                            {{ message }}
+                        </div>
+                        {% endfor%}                    
+                {% endif %}
+                {% endwith %}
+        
+        
+                <form action="{{url_for('login.change_info', username=username)}}" class="form ui" method="POST">
+                    
+                    <h3 class="ui dividing header">Change information</h3>
+                    {{form.csrf_token}}
+                    <div class="required field">
+                        {{ form.current_password.label }}
+                        {{ form.current_password }}
+
+                        {% if form.current_password.errors %}
+                        <div class="ui pointing red basic label">
+                            {{ form.current_password.errors[0] }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="field">
+                        {{ form.email.label }}
+                        {{ form.email}}
+                        {% if form.email.errors %}
+                        <div class="ui pointing red basic label">
+                            {{ form.email.errors[0] }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="field">
+                        {{ form.password.label }}
+                        {{ form.password }}
+                    
+                    </div>
+                    
+                    <div class="two fields">
+                        <div class="field">
+                            <button class="blue ui button fluid">Confirm change</button>
+                        </div>
+                        <div class="field">
+                            <a href="{{ url_for('login.settings', username=username) }}" class="black ui button fluid">Abort</a>
+                        </div>
+                    </div>
+                </form>
+        </div>
+        
+</div>
+{% endblock %}
