@@ -2,7 +2,7 @@ from models import User, Candlestick_sub_detail, Currency_pair
 import requests
 import json
 import arrow
-from alerts.alerts_config import oandaApi, live_account
+from alerts.alerts_config import oandaApi, live_account, account_id
 
 class Telegram_bot:
     def __init__(self, telegramApi):
@@ -31,6 +31,26 @@ class Oanda_bot(Telegram_bot):
     fxlive = "https://api-fxtrade.oanda.com/"
     _base_url = fxlive if live_account else fxpractice
     
+    
+    def create_stop_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=1):
+        """units: unit to open, side: [buy, sell],  instrument: EUR_USD"""
+        
+        endpoint = "/v1/accounts/{}/orders".format(account_id)
+        expiry = arrow.utcnow().shift(hours=+23).timestamp
+
+        payload = {
+            "instrument" : instrument,
+            "units" : units,
+            "side" : side,
+            "type" : "stop",
+            "expiry" : expiry,
+            "price" : trigger_price, 
+            "stopLoss" : stop_loss,
+            "takeProfit" : take_profit
+        }
+
+        response = requests.post(Oanda_bot._base_url + endpoint, headers=Oanda_bot._headers, data=payload)
+        return response.json()
     
     def get_current_price(self, pair):
         endpoint = "/v1/prices"
