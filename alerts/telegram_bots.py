@@ -2,7 +2,7 @@ from models import User, Candlestick_sub_detail, Currency_pair
 import requests
 import json
 import arrow
-from alerts.alerts_config import oandaApi
+from alerts.alerts_config import oandaApi, live_account
 
 class Telegram_bot:
     def __init__(self, telegramApi):
@@ -27,8 +27,9 @@ class Oanda_bot(Telegram_bot):
                "Content-Type": "application/x-www-form-urlencoded",
                "X-Accept-Datetime-Format" : "UNIX"
               }
-    
-    _base_url = "https://api-fxtrade.oanda.com/"
+    fxpractice = "https://api-fxpractice.oanda.com"
+    fxlive = "https://api-fxtrade.oanda.com/"
+    _base_url = fxlive if live_account else fxpractice
     
     
     def get_current_price(self, pair):
