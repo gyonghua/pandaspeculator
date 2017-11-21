@@ -24,9 +24,9 @@ class Telegram_bot:
 
 class Oanda_bot(Telegram_bot):
     _headers = {"Authorization":oandaApi,
-               "Content-Type": "application/x-www-form-urlencoded",
-               "X-Accept-Datetime-Format" : "UNIX"
-              }
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-Accept-Datetime-Format" : "UNIX"
+               }
     fxpractice = "https://api-fxpractice.oanda.com"
     fxlive = "https://api-fxtrade.oanda.com/"
     _base_url = fxlive if live_account else fxpractice
