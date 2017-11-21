@@ -38,6 +38,11 @@ class Oanda_bot(Telegram_bot):
         endpoint = "/v1/accounts/{}/orders".format(account_id)
         expiry = arrow.utcnow().shift(hours=+23).timestamp
 
+        if "JPY" in instrument:
+            trigger_price = round(trigger_price, 2)
+            stop_loss = round(stop_loss, 2)
+            take_profit = round(take_profit, 2)
+
         payload = {
             "instrument" : instrument,
             "units" : units,
