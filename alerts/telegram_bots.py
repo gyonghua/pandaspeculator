@@ -32,7 +32,7 @@ class Oanda_bot(Telegram_bot):
     _base_url = fxlive if live_account else fxpractice
     
     
-    def create_stop_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=1):
+    def create_stop_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=100):
         """units: unit to open, side: [buy, sell],  instrument: EUR_USD"""
         
         endpoint = "/v1/accounts/{}/orders".format(account_id)
