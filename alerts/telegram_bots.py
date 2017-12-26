@@ -2,7 +2,7 @@ from models import User, Candlestick_sub_detail, Currency_pair
 import requests
 import json
 import arrow
-from alerts.alerts_config import oandaApi, live_account, account_id
+from alerts.alerts_config import oandaApi, live_account, account_id_1, account_id_2
 
 class Telegram_bot:
     def __init__(self, telegramApi):
@@ -32,11 +32,15 @@ class Oanda_bot(Telegram_bot):
     _base_url = fxlive if live_account else fxpractice
     
     
-    def create_stop_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=100):
+    def create_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=100, account="buy", expiry=23):
         """units: unit to open, side: [buy, sell],  instrument: EUR_USD"""
-        
+        if account == "buy":
+            account_id = account_id_1
+        elif account=="median_sell":
+            account_id = account_id_2
+
         endpoint = "/v1/accounts/{}/orders".format(account_id)
-        expiry = arrow.utcnow().shift(hours=+23).timestamp
+        expiry = arrow.utcnow().shift(hours=+expiry).timestamp
 
         if "JPY" in instrument:
             trigger_price = round(trigger_price, 2)

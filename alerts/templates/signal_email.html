@@ -2,7 +2,7 @@
     <body>
     
     {% for signal in signals %}
-        <h4>{{ signal[0] }}</h4>
+        <h4>{{ signal[0] }} stops</h4>
         
         <p>
             <b>SL</b> {{ signal[1] }} <br>
@@ -11,5 +11,8 @@
         </p>
     {% endfor %}
     
+    <p>
+        <b>Note:</b> The signal are for unexpected news strat. To adapt it to mean reversion strategy, reverse the TP and SL and extend the expiry to 2 days instead of 1. 
+    </p>
     </body>
     </html>
