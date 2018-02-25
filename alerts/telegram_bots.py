@@ -32,7 +32,7 @@ class Oanda_bot(Telegram_bot):
     _base_url = fxlive if live_account else fxpractice
     
     
-    def create_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=100, account="buy", expiry=23, order_type="stop"):
+    def create_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=200, account="buy", expiry=23, order_type="stop"):
         """units: unit to open, side: [buy, sell],  instrument: EUR_USD"""
         if account == "buy":
             account_id = account_id_1
