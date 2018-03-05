@@ -25,10 +25,10 @@ class Telegram_bot:
 class Oanda_bot(Telegram_bot):
     _headers = {"Authorization":oandaApi,
                 "Content-Type": "application/x-www-form-urlencoded",
-                "X-Accept-Datetime-Format" : "UNIX"
+                "Accept-Datetime-Format" : "UNIX"
                }
     fxpractice = "https://api-fxpractice.oanda.com"
-    fxlive = "https://api-fxtrade.oanda.com/"
+    fxlive = "https://api-fxtrade.oanda.com"
     _base_url = fxlive if live_account else fxpractice
     
     
@@ -85,15 +85,14 @@ class Oanda_bot(Telegram_bot):
         return self.send(chat_id, message)
 
     @classmethod
-    def getCandles(cls, pair, tf, count=30):
+    def getCandles(cls, pair, tf, count=31):
         """returns a json requests object. gets the last 30 candles, not including the current candle"""
-        endpoint = "/v1/candles"
+        endpoint = "/v3/instruments/{}/candles".format(pair)
         now = arrow.utcnow()
         previous_hourUNIX = now.shift(hours=-1).timestamp
         candleformat = "midpoint"
 
         payload = {
-        "instrument" : pair,
         "granularity" : tf,
         "count" : count,
         "end" : previous_hourUNIX,
@@ -153,8 +152,8 @@ class Oanda_bot(Telegram_bot):
     
     def get_ADR(self, pair, tf, count):
         data = Oanda_bot.getCandles(pair, tf, count).json()
-        candles = data["candles"]
-        daily_ranges = [candle["highMid"] - candle["lowMid"] for candle in candles]
+        candles = data["candles"]["mid"]
+        daily_ranges = [float(candle["h"]) - float(candle["l"]) for candle in candles]
 
         average_daily_range = sum(daily_ranges)/count
 
@@ -164,6 +163,7 @@ class Oanda_bot(Telegram_bot):
 class Bar_pattern_bot(Oanda_bot):
     pairs_master_list = ["EUR_USD", "GBP_USD", "AUD_USD", "EUR_GBP", "USD_CAD","USD_JPY", "EUR_JPY"]
     def __init__(self, api, tf):
+        # parent of Oanda is Telegram 
         super(Oanda_bot, self).__init__(api)
         self.tf = tf
         self.pairs = {}
@@ -174,34 +174,34 @@ class Bar_pattern_bot(Oanda_bot):
 
     @classmethod
     def _isBullishOutsideBar(cls, latestCandle, previousCandle, secondlastCandle):
-        criteria_1 = latestCandle["highMid"] > previousCandle["highMid"]
-        criteria_2 = latestCandle["lowMid"] < previousCandle["lowMid"]
-        criteria_3 = latestCandle["closeMid"] > previousCandle["highMid"]
-        criteria_4 = latestCandle["highMid"] > secondlastCandle["highMid"]
-        criteria_5 = latestCandle["lowMid"] < secondlastCandle["lowMid"]
+        criteria_1 = float(latestCandle["h"]) > float(previousCandle["h"])
+        criteria_2 = float(latestCandle["l"]) < float(previousCandle["l"])
+        criteria_3 = float(latestCandle["c"]) > float(previousCandle["h"])
+        criteria_4 = float(latestCandle["h"]) > float(secondlastCandle["h"])
+        criteria_5 = float(latestCandle["l"]) < float(secondlastCandle["l"])
 
         return (criteria_1 and criteria_2 and criteria_3 and criteria_4 and criteria_5)
 
     @classmethod
     def _isBearishOutsideBar(cls, latestCandle, previousCandle, secondlastCandle):
-        criteria_1 = latestCandle["highMid"] > previousCandle["highMid"]
-        criteria_2 = latestCandle["lowMid"] < previousCandle["lowMid"]
-        criteria_3 = latestCandle["closeMid"] < previousCandle["lowMid"]
-        criteria_4 = latestCandle["highMid"] > secondlastCandle["highMid"]
-        criteria_5 = latestCandle["lowMid"] < secondlastCandle["lowMid"]
+        criteria_1 = float(latestCandle["h"]) > float(previousCandle["h"])
+        criteria_2 = float(latestCandle["l"]) < float(previousCandle["l"])
+        criteria_3 = float(latestCandle["c"]) < float(previousCandle["l"])
+        criteria_4 = float(latestCandle["h"]) > float(secondlastCandle["h"])
+        criteria_5 = float(latestCandle["l"]) < float(secondlastCandle["l"])
 
         return (criteria_1 and criteria_2 and criteria_3 and criteria_4 and criteria_5)
 
     @classmethod
     def _isTopPin(cls, latestCandle, previousCandle):
-        criteria_1 = latestCandle["closeMid"] < previousCandle["highMid"] 
-        criteria_2 = latestCandle["lowMid"] > previousCandle["lowMid"]
-        criteria_3 = latestCandle["highMid"] > previousCandle["highMid"]
+        criteria_1 = float(latestCandle["c"]) < float(previousCandle["h"])
+        criteria_2 = float(latestCandle["l"]) > float(previousCandle["l"])
+        criteria_3 = float(latestCandle["h"]) > float(previousCandle["h"])
 
-        previousBarRange = previousCandle["highMid"] - previousCandle["lowMid"]
+        previousBarRange = float(previousCandle["h"]) - float(previousCandle["l"])
 
-        distance_1 = previousCandle["highMid"] - latestCandle["lowMid"]
-        distance_2 = latestCandle["highMid"] - previousCandle["highMid"]
+        distance_1 = float(previousCandle["h"]) - float(latestCandle["l"])
+        distance_2 = float(latestCandle["h"]) - float(previousCandle["h"])
 
         criteria_4 = distance_2 > distance_1
         criteria_5 = previousBarRange > 0.0010 # this has an issue for jpy and usd pairs. To improve with percentage instead
@@ -211,14 +211,14 @@ class Bar_pattern_bot(Oanda_bot):
     @classmethod
     def _isBottomPin(cls, latestCandle, previousCandle):
 
-        criteria_1 = latestCandle["lowMid"] < previousCandle["lowMid"]
-        criteria_2 = latestCandle["closeMid"] > previousCandle["lowMid"]
-        criteria_3 = latestCandle["highMid"] < previousCandle["highMid"]
+        criteria_1 = float(latestCandle["l"]) < float(previousCandle["l"])
+        criteria_2 = float(latestCandle["c"]) > float(previousCandle["l"])
+        criteria_3 = float(latestCandle["h"]) < float(previousCandle["h"])
 
-        previousBarRange = previousCandle["highMid"] - previousCandle["lowMid"]
+        previousBarRange = float(previousCandle["h"]) - float(previousCandle["l"])
 
-        distance_1 = latestCandle["highMid"] - previousCandle["lowMid"]
-        distance_2 = previousCandle["lowMid"] - latestCandle["lowMid"]
+        distance_1 = float(latestCandle["h"]) - float(previousCandle["l"])
+        distance_2 = float(previousCandle["l"]) - float(latestCandle["l"])
 
         criteria_4 = distance_2 > distance_1
         criteria_5 = previousBarRange > 0.0010
@@ -227,13 +227,13 @@ class Bar_pattern_bot(Oanda_bot):
 
     @classmethod
     def _isUpTrend(cls, sorted_candles):
-        candleLows = [candle["lowMid"] for candle in sorted_candles]
+        candleLows = [float(candle["mid"]["l"]) for candle in sorted_candles]
 
         return candleLows[0] > min(candleLows)
 
     @classmethod
     def _isDownTrend(cls, sorted_candles):
-        candleHighs = [candle["highMid"] for candle in sorted_candles]
+        candleHighs = [float(candle["mid"]["h"]) for candle in sorted_candles]
 
         return candleHighs[0] < max(candleHighs)
 
@@ -241,12 +241,14 @@ class Bar_pattern_bot(Oanda_bot):
     def _detectPattern(self, pair):
         data = self.getCandles(pair).json()
         candles = data["candles"]
-        sorted_candles = sorted(candles, key=lambda k: k["time"], reverse=True)
-        latestCandle = sorted_candles[0]
-        previousCandle = sorted_candles[1]
-        secondlastCandle = sorted_candles[2]
-        uptrend = Bar_pattern_bot._isUpTrend(sorted_candles)
-        downtrend = Bar_pattern_bot._isDownTrend(sorted_candles)
+        sorted_candles = sorted(candles, key=lambda k: int(float(k["time"])), reverse=True)
+        # v20 api returns current candle that is not complete hence the slicing
+        true_sorted_candles = sorted_candles[1:]
+        latestCandle = true_sorted_candles[0]["mid"]
+        previousCandle = true_sorted_candles[1]["mid"]
+        secondlastCandle = true_sorted_candles[2]["mid"]
+        uptrend = Bar_pattern_bot._isUpTrend(true_sorted_candles)
+        downtrend = Bar_pattern_bot._isDownTrend(true_sorted_candles)
 
         if Bar_pattern_bot._isTopPin(latestCandle, previousCandle):
             return "{}: <b>Top</b> pin detected. Downtrend(30) <b>{}</b>.".format(pair, downtrend)
@@ -295,7 +297,3 @@ class Bar_pattern_bot(Oanda_bot):
                 timeframe = self.tf
                 message += "\nTimeframe: <b>{}</b>. {} GMT".format(timeframe, str(arrow.utcnow().format("D MMM HH:mm")))
                 self.send(telegram_id, message)
-
-
-
-
