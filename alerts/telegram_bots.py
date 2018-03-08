@@ -1,8 +1,9 @@
 from models import User, Candlestick_sub_detail, Currency_pair
 import requests
 import json
+import traceback
 import arrow
-from alerts.alerts_config import oandaApi, live_account, account_id_1, account_id_2
+from alerts.alerts_config import oandaApi, live_account, account_id_1, account_id_2, account_id_3, telegramApi
 
 class Telegram_bot:
     def __init__(self, telegramApi):
@@ -24,7 +25,7 @@ class Telegram_bot:
 
 class Oanda_bot(Telegram_bot):
     _headers = {"Authorization":oandaApi,
-                "Content-Type": "application/x-www-form-urlencoded",
+                "Content-Type": "application/json",
                 "Accept-Datetime-Format" : "UNIX"
                }
     fxpractice = "https://api-fxpractice.oanda.com"
@@ -62,23 +63,30 @@ class Oanda_bot(Telegram_bot):
         return response.json()
     
     def get_current_price(self, pair):
-        endpoint = "/v1/prices"
+        endpoint = "/v3/accounts/{}/pricing".format(account_id_3)
         modified_pair = pair[:3] + "_" + pair[3:]
         cleaned_pair = modified_pair.upper()
         payload = {
-            "instruments" : cleaned_pair
+            "instruments" : cleaned_pair,
+            "includeUnitsAvailable" : False
         }
 
-        response = requests.get(Oanda_bot._base_url + endpoint, headers=Oanda_bot._headers, params=payload)
-        price = response.json()
-        if "message" in price:
-            return price["message"]
-        else:
-            bid = price["prices"][0]["bid"]
-            ask = price["prices"][0]["ask"]
-            
-            return str(bid) + "/" + str(ask)
+        try:
+            response = requests.get(Oanda_bot._base_url + endpoint,     headers=Oanda_bot._headers, params=payload)
+            status_code =response.status_code
+            price = response.json()
+            if status_code == 200:
+                bid = price["prices"][0]["bids"][0]["price"]
+                ask = price["prices"][0]["asks"][0]["price"]
+                return "{}/{}".format(bid, ask)
+            elif status_code in [400, 401, 404, 405]:
+                return price["errorMessage"]
         
+        except:
+            print(traceback.print_exc())
+            return "unknown error in retrieving price"
+
+
     def notify_current_price(self,chat_id, pair):
         price = self.get_current_price(pair)
         message = "{} : {}".format(pair, price)
@@ -106,7 +114,16 @@ class Oanda_bot(Telegram_bot):
 
         return candles
 
+    def get_orderbook_v20(self, pair):
+        endpoint = "/v3/instruments/{}/orderBook".format(pair)
+
+        response = requests.get(Oanda_bot._base_url + endpoint, 
+                                headers=Oanda_bot._headers)
+        
+        return response.json()
+    
     def get_orderbook(self, pair):
+        #depreciated
         endpoint = "labs/v1/orderbook_data"
 
         payload = {
@@ -119,7 +136,41 @@ class Oanda_bot(Telegram_bot):
                                 params=payload)
         return response.json()
     
+    def get_latest_net_orders_v20(self, pair):
+        orderbook = self.get_orderbook_v20(pair)
+
+        latest_orderbook_timestamp = orderbook["orderBook"]["time"]
+        latest_time = arrow.get(latest_orderbook_timestamp).format("D MMM HH:mm")
+        orderbook_rate = float(orderbook["orderBook"]["price"])
+
+        net_buystop_orders = []
+        net_sellstop_orders = []
+        orderbook_prices = orderbook["orderBook"]["buckets"] 
+        for bucket in orderbook_prices:
+            price = bucket["price"]
+            long_order = float(bucket["longCountPercent"])
+            short_order = float(bucket["shortCountPercent"])
+            if float(price) > orderbook_rate:
+                tup = (price, round(long_order - short_order, 5))
+                net_buystop_orders.append(tup)
+            elif float(price) < orderbook_rate:
+                tup = (price,round(short_order - long_order, 5))
+                net_sellstop_orders.append(tup)
+
+        #arrange by highest percentage first
+        sorted_net_buystop_orders = sorted(net_buystop_orders, key = lambda x: x[1], reverse=True)   
+        sorted_net_sellstop_orders = sorted(net_sellstop_orders, key = lambda x: x[1], reverse=True)    
+        top_5_buy_order_vol = []
+        top_5_sell_order_vol = []
+
+        for no in range(5):
+            top_5_buy_order_vol.append(sorted_net_buystop_orders[no])
+            top_5_sell_order_vol.append(sorted_net_sellstop_orders[no])
+
+        return latest_time, pair, top_5_buy_order_vol, top_5_sell_order_vol
+    
     def get_latest_net_orders(self, pair):
+        # depreciated
         orderbook = self.get_orderbook(pair)
 
         latest_orderbook_timestamp = max(orderbook, key=int)
@@ -152,8 +203,8 @@ class Oanda_bot(Telegram_bot):
     
     def get_ADR(self, pair, tf, count):
         data = Oanda_bot.getCandles(pair, tf, count).json()
-        candles = data["candles"]["mid"]
-        daily_ranges = [float(candle["h"]) - float(candle["l"]) for candle in candles]
+        candles = data["candles"]
+        daily_ranges = [float(candle["mid"]["h"]) - float(candle["mid"]["l"]) for candle in candles if candle["complete"]]
 
         average_daily_range = sum(daily_ranges)/count
 
@@ -297,3 +348,8 @@ class Bar_pattern_bot(Oanda_bot):
                 timeframe = self.tf
                 message += "\nTimeframe: <b>{}</b>. {} GMT".format(timeframe, str(arrow.utcnow().format("D MMM HH:mm")))
                 self.send(telegram_id, message)
+
+if __name__ == "__main__":
+    bot = Oanda_bot(telegramApi)
+    candles = bot.getCandles("EUR_USD", "D").json()
+    print(candles)

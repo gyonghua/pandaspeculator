@@ -24,7 +24,7 @@ msg["Date"] = formatdate(localtime=True)
 orderbook = list()
 for pair in forex_pairs:
     average_daily_range = round(Alert.get_ADR(pair, "D", 20), 4)
-    net_orders = Alert.get_latest_net_orders(pair)
+    net_orders = Alert.get_latest_net_orders_v20(pair)
     formatted_pair = pair.replace("_", "")
     current_price = Alert.get_current_price(formatted_pair)
     tup = (net_orders, current_price, average_daily_range)
