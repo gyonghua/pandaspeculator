@@ -97,7 +97,7 @@ class Oanda_bot(Telegram_bot):
         status = response.json()
 
         if response.status_code != 201:
-            logging.error("order creation failed: \n {}".format(status))
+            logging.error("{} order creation failed: \n {}".format(instrument, status))
         return status
 
     def get_current_price(self, pair):
