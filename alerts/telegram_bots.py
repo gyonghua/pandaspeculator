@@ -1,9 +1,18 @@
 from models import User, Candlestick_sub_detail, Currency_pair
 import requests
 import json
+from decimal import Decimal, ROUND_HALF_DOWN
+import logging
+import os
 import traceback
 import arrow
 from alerts.alerts_config import oandaApi, live_account, account_id_1, account_id_2, account_id_3, telegramApi
+
+cwd = os.getcwd()
+log_path = os.path.join(cwd, "bots.log")
+log_format = '%(asctime)s:%(levelname)s:%(message)s'
+date_format = '%d/%m/%Y %H:%M'
+logging.basicConfig(filename= log_path, format=log_format, datefmt=date_format)
 
 class Telegram_bot:
     def __init__(self, telegramApi):
@@ -33,35 +42,64 @@ class Oanda_bot(Telegram_bot):
     _base_url = fxlive if live_account else fxpractice
     
     
-    def create_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=200, account="buy", expiry=23, order_type="stop"):
-        """units: unit to open, side: [buy, sell],  instrument: EUR_USD"""
+    def create_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=200, account="automate", expiry=23, order_type="STOP"):
+        """units: unit to open, side: [buy, sell],  instrument: EUR_USD, order_type = ["STOP","LIMIT"]"""
         if account == "buy":
             account_id = account_id_1
         elif account=="median_sell":
             account_id = account_id_2
-
-        endpoint = "/v1/accounts/{}/orders".format(account_id)
+        elif account == "automate":
+            account_id = account_id_3
+        
+        endpoint = "/v3/accounts/{}/orders".format(account_id)
         expiry = arrow.utcnow().shift(hours=+expiry).timestamp
-
+        expiry = str(expiry) + ".000000000"
+        
+        if side == "sell":
+            units = -units 
+        
+        
         if "JPY" in instrument:
-            trigger_price = round(trigger_price, 2)
-            stop_loss = round(stop_loss, 2)
-            take_profit = round(take_profit, 2)
+            trigger_price = trigger_price.quantize(Decimal("1.01"), rounding=ROUND_HALF_DOWN)
+            stop_loss = stop_loss.quantize(Decimal("1.01"), rounding=ROUND_HALF_DOWN)
+            take_profit = take_profit.quantize(Decimal("1.01"), rounding=ROUND_HALF_DOWN)
 
+        if not isinstance(trigger_price, str):
+            trigger_price = str(trigger_price)
+        if not isinstance(stop_loss, str):
+            stop_loss = str(stop_loss)
+        if not isinstance(take_profit, str):
+            take_profit = str(take_profit)
+        
         payload = {
+            "order" : 
+            {
             "instrument" : instrument,
-            "units" : units,
-            "side" : side,
+            "units" : str(units),
             "type" : order_type,
-            "expiry" : expiry,
+            "timeInForce" : "GTD",
+            "gtdTime" : expiry,
             "price" : trigger_price, 
-            "stopLoss" : stop_loss,
-            "takeProfit" : take_profit
-        }
+            "stopLossOnFill" : {
+                "price" : stop_loss,
+                "timeInForce" : "GTD",
+                "gtdTime" : expiry
+                },
+            "takeProfitOnFill" : {
+                "price" : take_profit,
+                "timeInForce" : "GTD",
+                "gtdTime" : expiry
+                }
+            }}
 
-        response = requests.post(Oanda_bot._base_url + endpoint, headers=Oanda_bot._headers, data=payload)
-        return response.json()
-    
+        response = requests.post(Oanda_bot._base_url + endpoint, headers=Oanda_bot._headers, json=payload)
+
+        status = response.json()
+
+        if response.status_code != 201:
+            logging.error("order creation failed: \n {}".format(status))
+        return status
+
     def get_current_price(self, pair):
         endpoint = "/v3/accounts/{}/pricing".format(account_id_3)
         modified_pair = pair[:3] + "_" + pair[3:]
