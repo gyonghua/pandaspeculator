@@ -1,8 +1,18 @@
 from models import User, Candlestick_sub_detail, Currency_pair
 import requests
 import json
+from decimal import Decimal, ROUND_HALF_DOWN
+import logging
+import os
+import traceback
 import arrow
-from alerts.alerts_config import oandaApi
+from alerts.alerts_config import oandaApi, live_account, account_id_1, account_id_2, account_id_3, telegramApi
+
+cwd = os.getcwd()
+log_path = os.path.join(cwd, "bots.log")
+log_format = '%(asctime)s:%(levelname)s:%(message)s'
+date_format = '%d/%m/%Y %H:%M'
+logging.basicConfig(filename= log_path, format=log_format, datefmt=date_format)
 
 class Telegram_bot:
     def __init__(self, telegramApi):
@@ -24,46 +34,111 @@ class Telegram_bot:
 
 class Oanda_bot(Telegram_bot):
     _headers = {"Authorization":oandaApi,
-               "Content-Type": "application/x-www-form-urlencoded",
-               "X-Accept-Datetime-Format" : "UNIX"
-              }
+                "Content-Type": "application/json",
+                "Accept-Datetime-Format" : "UNIX"
+               }
+    fxpractice = "https://api-fxpractice.oanda.com"
+    fxlive = "https://api-fxtrade.oanda.com"
+    _base_url = fxlive if live_account else fxpractice
     
-    _base_url = "https://api-fxtrade.oanda.com/"
     
-    
+    def create_order(self, trigger_price, stop_loss, take_profit, side, instrument, units=200, account="automate", expiry=23, order_type="STOP"):
+        """units: unit to open, side: [buy, sell],  instrument: EUR_USD, order_type = ["STOP","LIMIT"]"""
+        if account == "buy":
+            account_id = account_id_1
+        elif account=="median_sell":
+            account_id = account_id_2
+        elif account == "automate":
+            account_id = account_id_3
+        
+        endpoint = "/v3/accounts/{}/orders".format(account_id)
+        expiry = arrow.utcnow().shift(hours=+expiry).timestamp
+        expiry = str(expiry) + ".000000000"
+        
+        if side == "sell":
+            units = -units 
+        
+        
+        if "JPY" in instrument:
+            trigger_price = trigger_price.quantize(Decimal("1.01"), rounding=ROUND_HALF_DOWN)
+            stop_loss = stop_loss.quantize(Decimal("1.01"), rounding=ROUND_HALF_DOWN)
+            take_profit = take_profit.quantize(Decimal("1.01"), rounding=ROUND_HALF_DOWN)
+
+        if not isinstance(trigger_price, str):
+            trigger_price = str(trigger_price)
+        if not isinstance(stop_loss, str):
+            stop_loss = str(stop_loss)
+        if not isinstance(take_profit, str):
+            take_profit = str(take_profit)
+        
+        payload = {
+            "order" : 
+            {
+            "instrument" : instrument,
+            "units" : str(units),
+            "type" : order_type,
+            "timeInForce" : "GTD",
+            "gtdTime" : expiry,
+            "price" : trigger_price, 
+            "stopLossOnFill" : {
+                "price" : stop_loss,
+                "timeInForce" : "GTD",
+                "gtdTime" : expiry
+                },
+            "takeProfitOnFill" : {
+                "price" : take_profit,
+                "timeInForce" : "GTD",
+                "gtdTime" : expiry
+                }
+            }}
+
+        response = requests.post(Oanda_bot._base_url + endpoint, headers=Oanda_bot._headers, json=payload)
+
+        status = response.json()
+
+        if response.status_code != 201:
+            logging.error("{} order creation failed: \n {}".format(instrument, status))
+        return status
+
     def get_current_price(self, pair):
-        endpoint = "/v1/prices"
+        endpoint = "/v3/accounts/{}/pricing".format(account_id_3)
         modified_pair = pair[:3] + "_" + pair[3:]
         cleaned_pair = modified_pair.upper()
         payload = {
-            "instruments" : cleaned_pair
+            "instruments" : cleaned_pair,
+            "includeUnitsAvailable" : False
         }
 
-        response = requests.get(Oanda_bot._base_url + endpoint, headers=Oanda_bot._headers, params=payload)
-        price = response.json()
-        if "message" in price:
-            return price["message"]
-        else:
-            bid = price["prices"][0]["bid"]
-            ask = price["prices"][0]["ask"]
-            
-            return str(bid) + "/" + str(ask)
+        try:
+            response = requests.get(Oanda_bot._base_url + endpoint,     headers=Oanda_bot._headers, params=payload)
+            status_code =response.status_code
+            price = response.json()
+            if status_code == 200:
+                bid = price["prices"][0]["bids"][0]["price"]
+                ask = price["prices"][0]["asks"][0]["price"]
+                return "{}/{}".format(bid, ask)
+            elif status_code in [400, 401, 404, 405]:
+                return price["errorMessage"]
         
+        except:
+            print(traceback.print_exc())
+            return "unknown error in retrieving price"
+
+
     def notify_current_price(self,chat_id, pair):
         price = self.get_current_price(pair)
         message = "{} : {}".format(pair, price)
         return self.send(chat_id, message)
 
     @classmethod
-    def getCandles(cls, pair, tf, count=30):
+    def getCandles(cls, pair, tf, count=31):
         """returns a json requests object. gets the last 30 candles, not including the current candle"""
-        endpoint = "/v1/candles"
+        endpoint = "/v3/instruments/{}/candles".format(pair)
         now = arrow.utcnow()
         previous_hourUNIX = now.shift(hours=-1).timestamp
         candleformat = "midpoint"
 
         payload = {
-        "instrument" : pair,
         "granularity" : tf,
         "count" : count,
         "end" : previous_hourUNIX,
@@ -77,7 +152,16 @@ class Oanda_bot(Telegram_bot):
 
         return candles
 
+    def get_orderbook_v20(self, pair):
+        endpoint = "/v3/instruments/{}/orderBook".format(pair)
+
+        response = requests.get(Oanda_bot._base_url + endpoint, 
+                                headers=Oanda_bot._headers)
+        
+        return response.json()
+    
     def get_orderbook(self, pair):
+        #depreciated
         endpoint = "labs/v1/orderbook_data"
 
         payload = {
@@ -90,7 +174,41 @@ class Oanda_bot(Telegram_bot):
                                 params=payload)
         return response.json()
     
+    def get_latest_net_orders_v20(self, pair):
+        orderbook = self.get_orderbook_v20(pair)
+
+        latest_orderbook_timestamp = orderbook["orderBook"]["time"]
+        latest_time = arrow.get(latest_orderbook_timestamp).format("D MMM HH:mm")
+        orderbook_rate = float(orderbook["orderBook"]["price"])
+
+        net_buystop_orders = []
+        net_sellstop_orders = []
+        orderbook_prices = orderbook["orderBook"]["buckets"] 
+        for bucket in orderbook_prices:
+            price = bucket["price"]
+            long_order = float(bucket["longCountPercent"])
+            short_order = float(bucket["shortCountPercent"])
+            if float(price) > orderbook_rate:
+                tup = (price, round(long_order - short_order, 5))
+                net_buystop_orders.append(tup)
+            elif float(price) < orderbook_rate:
+                tup = (price,round(short_order - long_order, 5))
+                net_sellstop_orders.append(tup)
+
+        #arrange by highest percentage first
+        sorted_net_buystop_orders = sorted(net_buystop_orders, key = lambda x: x[1], reverse=True)   
+        sorted_net_sellstop_orders = sorted(net_sellstop_orders, key = lambda x: x[1], reverse=True)    
+        top_5_buy_order_vol = []
+        top_5_sell_order_vol = []
+
+        for no in range(5):
+            top_5_buy_order_vol.append(sorted_net_buystop_orders[no])
+            top_5_sell_order_vol.append(sorted_net_sellstop_orders[no])
+
+        return latest_time, pair, top_5_buy_order_vol, top_5_sell_order_vol
+    
     def get_latest_net_orders(self, pair):
+        # depreciated
         orderbook = self.get_orderbook(pair)
 
         latest_orderbook_timestamp = max(orderbook, key=int)
@@ -124,7 +242,7 @@ class Oanda_bot(Telegram_bot):
     def get_ADR(self, pair, tf, count):
         data = Oanda_bot.getCandles(pair, tf, count).json()
         candles = data["candles"]
-        daily_ranges = [candle["highMid"] - candle["lowMid"] for candle in candles]
+        daily_ranges = [float(candle["mid"]["h"]) - float(candle["mid"]["l"]) for candle in candles if candle["complete"]]
 
         average_daily_range = sum(daily_ranges)/count
 
@@ -134,6 +252,7 @@ class Oanda_bot(Telegram_bot):
 class Bar_pattern_bot(Oanda_bot):
     pairs_master_list = ["EUR_USD", "GBP_USD", "AUD_USD", "EUR_GBP", "USD_CAD","USD_JPY", "EUR_JPY"]
     def __init__(self, api, tf):
+        # parent of Oanda is Telegram 
         super(Oanda_bot, self).__init__(api)
         self.tf = tf
         self.pairs = {}
@@ -144,34 +263,34 @@ class Bar_pattern_bot(Oanda_bot):
 
     @classmethod
     def _isBullishOutsideBar(cls, latestCandle, previousCandle, secondlastCandle):
-        criteria_1 = latestCandle["highMid"] > previousCandle["highMid"]
-        criteria_2 = latestCandle["lowMid"] < previousCandle["lowMid"]
-        criteria_3 = latestCandle["closeMid"] > previousCandle["highMid"]
-        criteria_4 = latestCandle["highMid"] > secondlastCandle["highMid"]
-        criteria_5 = latestCandle["lowMid"] < secondlastCandle["lowMid"]
+        criteria_1 = float(latestCandle["h"]) > float(previousCandle["h"])
+        criteria_2 = float(latestCandle["l"]) < float(previousCandle["l"])
+        criteria_3 = float(latestCandle["c"]) > float(previousCandle["h"])
+        criteria_4 = float(latestCandle["h"]) > float(secondlastCandle["h"])
+        criteria_5 = float(latestCandle["l"]) < float(secondlastCandle["l"])
 
         return (criteria_1 and criteria_2 and criteria_3 and criteria_4 and criteria_5)
 
     @classmethod
     def _isBearishOutsideBar(cls, latestCandle, previousCandle, secondlastCandle):
-        criteria_1 = latestCandle["highMid"] > previousCandle["highMid"]
-        criteria_2 = latestCandle["lowMid"] < previousCandle["lowMid"]
-        criteria_3 = latestCandle["closeMid"] < previousCandle["lowMid"]
-        criteria_4 = latestCandle["highMid"] > secondlastCandle["highMid"]
-        criteria_5 = latestCandle["lowMid"] < secondlastCandle["lowMid"]
+        criteria_1 = float(latestCandle["h"]) > float(previousCandle["h"])
+        criteria_2 = float(latestCandle["l"]) < float(previousCandle["l"])
+        criteria_3 = float(latestCandle["c"]) < float(previousCandle["l"])
+        criteria_4 = float(latestCandle["h"]) > float(secondlastCandle["h"])
+        criteria_5 = float(latestCandle["l"]) < float(secondlastCandle["l"])
 
         return (criteria_1 and criteria_2 and criteria_3 and criteria_4 and criteria_5)
 
     @classmethod
     def _isTopPin(cls, latestCandle, previousCandle):
-        criteria_1 = latestCandle["closeMid"] < previousCandle["highMid"] 
-        criteria_2 = latestCandle["lowMid"] > previousCandle["lowMid"]
-        criteria_3 = latestCandle["highMid"] > previousCandle["highMid"]
+        criteria_1 = float(latestCandle["c"]) < float(previousCandle["h"])
+        criteria_2 = float(latestCandle["l"]) > float(previousCandle["l"])
+        criteria_3 = float(latestCandle["h"]) > float(previousCandle["h"])
 
-        previousBarRange = previousCandle["highMid"] - previousCandle["lowMid"]
+        previousBarRange = float(previousCandle["h"]) - float(previousCandle["l"])
 
-        distance_1 = previousCandle["highMid"] - latestCandle["lowMid"]
-        distance_2 = latestCandle["highMid"] - previousCandle["highMid"]
+        distance_1 = float(previousCandle["h"]) - float(latestCandle["l"])
+        distance_2 = float(latestCandle["h"]) - float(previousCandle["h"])
 
         criteria_4 = distance_2 > distance_1
         criteria_5 = previousBarRange > 0.0010 # this has an issue for jpy and usd pairs. To improve with percentage instead
@@ -181,14 +300,14 @@ class Bar_pattern_bot(Oanda_bot):
     @classmethod
     def _isBottomPin(cls, latestCandle, previousCandle):
 
-        criteria_1 = latestCandle["lowMid"] < previousCandle["lowMid"]
-        criteria_2 = latestCandle["closeMid"] > previousCandle["lowMid"]
-        criteria_3 = latestCandle["highMid"] < previousCandle["highMid"]
+        criteria_1 = float(latestCandle["l"]) < float(previousCandle["l"])
+        criteria_2 = float(latestCandle["c"]) > float(previousCandle["l"])
+        criteria_3 = float(latestCandle["h"]) < float(previousCandle["h"])
 
-        previousBarRange = previousCandle["highMid"] - previousCandle["lowMid"]
+        previousBarRange = float(previousCandle["h"]) - float(previousCandle["l"])
 
-        distance_1 = latestCandle["highMid"] - previousCandle["lowMid"]
-        distance_2 = previousCandle["lowMid"] - latestCandle["lowMid"]
+        distance_1 = float(latestCandle["h"]) - float(previousCandle["l"])
+        distance_2 = float(previousCandle["l"]) - float(latestCandle["l"])
 
         criteria_4 = distance_2 > distance_1
         criteria_5 = previousBarRange > 0.0010
@@ -197,13 +316,13 @@ class Bar_pattern_bot(Oanda_bot):
 
     @classmethod
     def _isUpTrend(cls, sorted_candles):
-        candleLows = [candle["lowMid"] for candle in sorted_candles]
+        candleLows = [float(candle["mid"]["l"]) for candle in sorted_candles]
 
         return candleLows[0] > min(candleLows)
 
     @classmethod
     def _isDownTrend(cls, sorted_candles):
-        candleHighs = [candle["highMid"] for candle in sorted_candles]
+        candleHighs = [float(candle["mid"]["h"]) for candle in sorted_candles]
 
         return candleHighs[0] < max(candleHighs)
 
@@ -211,12 +330,14 @@ class Bar_pattern_bot(Oanda_bot):
     def _detectPattern(self, pair):
         data = self.getCandles(pair).json()
         candles = data["candles"]
-        sorted_candles = sorted(candles, key=lambda k: k["time"], reverse=True)
-        latestCandle = sorted_candles[0]
-        previousCandle = sorted_candles[1]
-        secondlastCandle = sorted_candles[2]
-        uptrend = Bar_pattern_bot._isUpTrend(sorted_candles)
-        downtrend = Bar_pattern_bot._isDownTrend(sorted_candles)
+        sorted_candles = sorted(candles, key=lambda k: int(float(k["time"])), reverse=True)
+        # v20 api returns current candle that is not complete hence the slicing
+        true_sorted_candles = sorted_candles[1:]
+        latestCandle = true_sorted_candles[0]["mid"]
+        previousCandle = true_sorted_candles[1]["mid"]
+        secondlastCandle = true_sorted_candles[2]["mid"]
+        uptrend = Bar_pattern_bot._isUpTrend(true_sorted_candles)
+        downtrend = Bar_pattern_bot._isDownTrend(true_sorted_candles)
 
         if Bar_pattern_bot._isTopPin(latestCandle, previousCandle):
             return "{}: <b>Top</b> pin detected. Downtrend(30) <b>{}</b>.".format(pair, downtrend)
@@ -266,6 +387,7 @@ class Bar_pattern_bot(Oanda_bot):
                 message += "\nTimeframe: <b>{}</b>. {} GMT".format(timeframe, str(arrow.utcnow().format("D MMM HH:mm")))
                 self.send(telegram_id, message)
 
-
-
-
+if __name__ == "__main__":
+    bot = Oanda_bot(telegramApi)
+    candles = bot.getCandles("EUR_USD", "D").json()
+    print(candles)
