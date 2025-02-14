@@ -1,5 +1,5 @@
 # About
-__A project to showcase skills acquired after web development self study from May - Aug 2017.__  
+__A project to showcase skills acquired after web development self study in 2017. 
 
 This is a forex alert system made with Flask. It does the following:  
 - scan major currency pairs for multiple bar patterns on the 1 hour, 4 hour, 1 day and sends subscribers telegram alerts when they occur. 
